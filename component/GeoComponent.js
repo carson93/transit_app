@@ -14,7 +14,8 @@ export default class GeoComponent extends Component {
             position: 'unknown',
             region: {},
             search: '',
-            isLoaded: false
+            isLoaded: false,
+            busStops: null
         }
         this.getCurrentLocation = this.getCurrentLocation.bind(this)
     }
@@ -22,7 +23,6 @@ export default class GeoComponent extends Component {
     static navigationOptions = {
         header: null
     }
-
 
     componentWillMount() {
         this.animatedValue = new Animated.ValueXY();
@@ -48,6 +48,26 @@ export default class GeoComponent extends Component {
         this.getCurrentLocation()
     }
 
+    getTravelTime() {
+
+    }
+
+    async getStops() {
+        console.log('hello');
+        let apiUrl = `https://api.translink.ca/rttiapi/v1/stops?apikey=ZFUEBho1ZLmYupfhbjeN&`+
+            `lat=${Math.round(this.state.region.latitude * 1000000) / 1000000}&`+
+            `long=${Math.round(this.state.region.longitude * 1000000) / 1000000}`
+        console.log(apiUrl);
+        await fetch(apiUrl, {
+          headers:{
+            'content-type': 'application/JSON'
+          }
+        })
+        .then((response) => response.json())
+        .then((response) => this.setState({busStops:response}))
+        .catch((error)=> console.log(error))
+    }
+
     getCurrentLocation() {
         navigator.geolocation.getCurrentPosition((position) => {
             console.log(position.coords);
@@ -55,12 +75,13 @@ export default class GeoComponent extends Component {
             this.setState({
                 region: {
                     latitude: position.coords.latitude,
-                    latitudeDelta: 0.05,
+                    latitudeDelta: 0.015,
                     longitude: position.coords.longitude,
-                    longitudeDelta: 0.05,
+                    longitudeDelta: 0.015,
                 },
                 isLoaded: true
             })
+            this.getStops();
         }, (error) => {console.log(error)})
     }
 
@@ -74,11 +95,22 @@ export default class GeoComponent extends Component {
             <View style={styles.map}>
             {this.state.isLoaded ? 
             <View style={styles.map}>
-                <MapView
+                {this.state.busStops != null && <MapView
                 initialRegion={this.state.region}
                 region={this.state.region}
                 style={styles.map}
-                /> 
+                >
+                {this.state.busStops.map(marker => (
+                    <MapView.Marker
+                      coordinate={{
+                        latitude: marker.Latitude,
+                        longitude: marker.Longitude
+                      }}
+                      title={`StopNo ${marker.StopNo}`}
+                      description={`${marker.Name}`}
+                    />
+                ))}
+                </MapView>}
                 <SearchBar 
                     round={true}
                     containerStyle={styles.searchContainer}
