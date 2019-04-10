@@ -4,11 +4,13 @@ import { createStackNavigator, createAppContainer } from 'react-navigation';
 
 import GeoComponent from './component/GeoComponent';
 import HomeComponent from './component/HomeComponent';
+import RegComponent from './component/RegComponent';
 
 const RootStack = createStackNavigator(
   {
     Home: HomeComponent,
-    Map: GeoComponent
+    Map: GeoComponent,
+    Reg: RegComponent
   },
   {
     initialRouteName: 'Home',
