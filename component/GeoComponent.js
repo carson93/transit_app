@@ -20,7 +20,8 @@ export default class GeoComponent extends Component {
             busInfo: [],
             polyline: null,
             destination: null,
-            destCoords: null
+            destCoords: null,
+            travelTime: null
         }
         this.getCurrentLocation = this.getCurrentLocation.bind(this)
     }
@@ -117,9 +118,10 @@ export default class GeoComponent extends Component {
         await fetch(apiUrl)
         .then((response) => response.json())
         .then((response) => {
-            console.log(response.routes[0].overview_polyline.points);
             let polyline = decode(response.routes[0].overview_polyline.points)
             this.setState({polyline});
+            this.setState({travelTime:response.routes[0].legs[0].duration.text})
+            console.log(this.state.travelTime);
         })
         .catch((error) => console.log(error))
     }
