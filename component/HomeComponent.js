@@ -15,7 +15,7 @@ export default class HomeComponent extends Component {
             password: null,
             users: null
         }
-    }
+    }  
 
     static navigationOptions = {
         header: null
@@ -26,7 +26,6 @@ export default class HomeComponent extends Component {
           let data = snapshot.val();
           let users = Object.values(data);
           this.setState({users})
-          console.log(this.state.users);
         })
     }
 
