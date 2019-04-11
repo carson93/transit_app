@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
-import { TouchableOpacity, StyleSheet, Text, View, Animated, PanResponder, ActivityIndicator, Dimensions } from 'react-native';
+import { ScrollView, TouchableOpacity, StyleSheet, Text, View, Animated, PanResponder, ActivityIndicator, Dimensions } from 'react-native';
 import { SearchBar } from 'react-native-elements'
 import Permissions from 'react-native-permissions'
 import MapView from 'react-native-maps'
@@ -18,6 +18,7 @@ export default class GeoComponent extends Component {
             isLoaded: false,
             busStops: null,
             busStopSelected: true,
+            searchSelected: false,
             busInfo: [],
             polyline: null,
             destination: null,
@@ -222,7 +223,7 @@ export default class GeoComponent extends Component {
                 {this.state.polyline != null && 
                     <MapView.Polyline coordinates={this.state.polyline} 
                     strokeWidth={5} 
-                    strokeColor='blue'/>}
+                    strokeColor='#0D91E2'/>}
                 {this.state.polyline != null &&
                     <MapView.Marker
                       coordinate={{
@@ -246,8 +247,61 @@ export default class GeoComponent extends Component {
                         if (this.getDestCoord(dest)) {
                             this.getRoute(dest)
                         }
+                        this.setState({searchSelected: true})
                     }}
                 />
+                {this.state.searchSelected ? 
+                <View style={styles.resultsContainer}>
+                    <View style={styles.titleContainer}>
+                        <Text style={styles.titleText}>BCIT</Text>
+                    </View>
+                    <View style={styles.favContainer}>
+                        <TouchableOpacity style={styles.favButton}>
+                            <Text style={styles.favText}>+</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <View style={styles.closeContainer}>
+                        <TouchableOpacity style={[styles.favButton, {paddingBottom: 10}]} onPress={()=>this.setState({searchSelected: false, polyline: null})}>
+                            <Text style={styles.favText}>x</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <View style={styles.instContainer}>
+                        <View style={styles.estimateContainer}>
+                            <Text style={{fontSize: 24, fontWeight: 'bold'}}>Estimated Travel Time</Text>
+                            <Text style={{fontSize: 18}}>10 min</Text>
+                        </View>
+                        <ScrollView style={{alignSelf: 'flex-start', paddingLeft: 20, width: '100%', marginTop: 30}}>
+                            <View style={{height: 60, alignItems: 'center', flexDirection: 'row'}}>
+                                <View style={{height: 62, width: 5, backgroundColor: '#0D91E2', alignItems: 'center', justifyContent: 'center', marginLeft: 9}}>
+                                    <View style={{height: 20, width: 20, backgroundColor: '#fff', borderRadius: 10, borderColor: '#0D91E2', borderWidth: 3}}>
+                                    </View>
+                                </View>
+                                <Text style={{marginLeft: 20, fontSize: 24}}>Walk to somewhere</Text>
+                            </View>
+                            <View style={{height: 60, alignItems: 'center', flexDirection: 'row'}}>
+                                <View style={{height: 62, width: 5, backgroundColor: '#0D91E2', alignItems: 'center', justifyContent: 'center', marginLeft: 9}}>
+                                    <View style={{height: 20, width: 20, backgroundColor: '#fff', borderRadius: 10, borderColor: '#0D91E2', borderWidth: 3}}>
+                                    </View>
+                                </View>
+                                <Text style={{marginLeft: 20, fontSize: 24}}>Walk to somewhere</Text>
+                            </View>
+                            <View style={{height: 60, alignItems: 'center', flexDirection: 'row'}}>
+                                <View style={{height: 62, width: 5, backgroundColor: '#0D91E2', alignItems: 'center', justifyContent: 'center', marginLeft: 9}}>
+                                    <View style={{height: 20, width: 20, backgroundColor: '#fff', borderRadius: 10, borderColor: '#0D91E2', borderWidth: 3}}>
+                                    </View>
+                                </View>
+                                <Text style={{marginLeft: 20, fontSize: 24}}>Walk to somewhere</Text>
+                            </View>
+                            <View style={{height: 60, alignItems: 'center', flexDirection: 'row'}}>
+                                <View style={{height: 62, width: 5, backgroundColor: '#0D91E2', alignItems: 'center', justifyContent: 'center', marginLeft: 9}}>
+                                    <View style={{height: 20, width: 20, backgroundColor: '#fff', borderRadius: 10, borderColor: '#0D91E2', borderWidth: 3}}>
+                                    </View>
+                                </View>
+                                <Text style={{marginLeft: 20, fontSize: 24}}>Walk to somewhere</Text>
+                            </View>
+                        </ScrollView>
+                    </View>
+                </View> :
                 <Animated.View style={[styles.infoBar, animatedStyle, {top: infoTop}]} {...this.panResponder.panHandlers}>
                     <View style={styles.infoTabs}>
                         <View style={styles.line}></View>
@@ -291,9 +345,9 @@ export default class GeoComponent extends Component {
                             <Text style={[styles.busNext, {color: '#777'}]}>10 min</Text>
                         </View>
                     </View>}
-                </Animated.View>
+                </Animated.View>}
             </View>
-            : <ActivityIndicator size='large' />}
+            : <ActivityIndicator size='large' color='#0D91E2'/>}
             </View>
         )
     }
@@ -316,17 +370,62 @@ const styles = StyleSheet.create({
   inputContainer: {
     backgroundColor: '#fff',
     height: 45,
-    shadowColor: "#000",
-    shadowOffset: {
-        width: 0,
-        height: 9,
-    },
-    shadowOpacity: 0.48,
-    shadowRadius: 11.95,
   },
   searchText: {
     color: '#000',
-    fontSize: 24,
+    fontSize: 20,
+  },
+  resultsContainer: {
+    width: '100%',
+    position: 'absolute',
+    bottom: 0
+  },
+  titleContainer: {
+    position: 'absolute',
+    top: -80,
+    left: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  titleText: {
+    color: '#0D91E2',
+    fontSize: 42,
+    fontWeight: 'bold',
+  },
+  favContainer: {
+    height: 50,
+    position: 'absolute',
+    top: -80,
+    right: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeContainer: {
+    height: 50,
+    position: 'absolute',
+    top: -80,
+    right: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  instContainer: {
+    backgroundColor: '#f9f9f9',
+    height: 250,    
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 15,
+  },
+  estimateContainer: { 
+    justifyContent: 'center',
+    paddingLeft: 20,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    width: '95%',
+    position: 'absolute',
+    top: -25,
+    left: '2.5%',
+    zIndex: 2,
+    height: 70,
   },
   infoBar: {
     position: 'absolute',
@@ -383,6 +482,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0D91E2',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingBottom: 2
   },
   favText: {
     color: '#fff',
