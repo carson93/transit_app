@@ -41,6 +41,14 @@ export default class RegComponent extends Component {
                 {text: 'OK'}
               ]
             )
+        } else if (username === null || password === null) {
+            Alert.alert(
+              'Invalid entry',
+              'Your username or password cannot be empty',
+              [
+                {text: 'OK'}
+              ]
+            )
         } else {
             addUser(username, password);
             this.props.navigation.replace('Map', {
