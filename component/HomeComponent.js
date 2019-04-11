@@ -25,7 +25,6 @@ export default class HomeComponent extends Component {
         itemsRef.on('value',async (snapshot)=>{
           let data = snapshot.val();
           let users = Object.values(data);
-          console.log(users);
           this.setState({users})
         })
     }

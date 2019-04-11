@@ -8,7 +8,11 @@ export const addUser = (username,password) => {
 }
 
 export const addRoute = (username,route) => {
-  let identifier = username + JSON.stringify(route)
+  let journey = {
+    start:route.start,
+    end:route.end
+  }
+  let identifier = username + JSON.stringify(journey)
   db.ref('/routes').push({
     id:identifier,
     username:username,

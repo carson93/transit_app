@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
-import { TouchableOpacity, StyleSheet, Text, View, Animated, PanResponder, ActivityIndicator, Image, Dimensions } from 'react-native';
+import { ScrollView, TouchableOpacity, StyleSheet, Text, View, Animated, PanResponder, ActivityIndicator, Image, Dimensions, Alert } from 'react-native';
 import { SearchBar } from 'react-native-elements'
 import Permissions from 'react-native-permissions'
 import MapView from 'react-native-maps'
@@ -21,6 +21,7 @@ export default class GeoComponent extends Component {
             isLoaded: false,
             busStops: null,
             busStopSelected: true,
+            searchSelected: false,
             busInfo: [],
             polyline: null,
             destination: null,
@@ -63,11 +64,16 @@ export default class GeoComponent extends Component {
         await this.getSavedRoutes();
     }
 
+    async loadRoute(route) {
+        if (this.getDestCoord(route.end)) {
+            await this.getRoute(route.start,route.end)
+        }
+    }
+
     async getSavedRoutes(){
         routesRef.on('value',async (snapshot)=>{
           let data = snapshot.val();
           let allRoutes = Object.values(data);
-          console.log(allRoutes);
           userRoutes = []
           for (let i = 0; i < allRoutes.length; i++) {
             if (allRoutes[i].username == this.props.navigation.getParam('username','')) {
@@ -94,7 +100,25 @@ export default class GeoComponent extends Component {
             end:this.state.destination,
             time:this.state.travelTime
         }
-        console.log(route);
+        for (let i = 0; i < this.state.userRoutes.length; i++){
+            if (this.state.userRoutes[i].route.end == route.end) {
+                Alert.alert(
+                  'Duplicate route',
+                  'This route has already been saved',
+                  [
+                    {text: 'OK'}
+                  ]
+                );
+                return
+            }
+        }
+        Alert.alert(
+          'Success',
+          'Route has been saved successfully',
+          [
+            {text: 'OK'}
+          ]
+        );
         addRoute(this.props.navigation.getParam('username',''),route);
     }
 
@@ -153,26 +177,36 @@ export default class GeoComponent extends Component {
         .catch((error) => {console.log(error)})
     }
 
-    async getRoute(destination) {
+    async getRoute(origin,destination) {
         let encodedDest = encodeURIComponent(destination)
         let apiUrl = `https://maps.googleapis.com/maps/api/directions/json?` +
-                     `origin=${this.state.region.latitude},${this.state.region.longitude}`+
+                     `origin=${origin}`+
                      `&destination=${encodedDest}`+
                      `&mode=transit&units=metric&transit_mode=bus&key=AIzaSyA2uBawhhpsC-QhPxkCcPeEeEKV5nKLSns`
         await fetch(apiUrl)
         .then((response) => response.json())
         .then((response) => {
+            if (response.status != 'OK') {
+                this.setState({searchSelected:false,polyline:null})
+                Alert.alert(
+                  'Cannot find route',
+                  'Google cannot find a route to the location',
+                  [
+                    {text: 'OK'}
+                  ]
+                );
+                return
+            }
             let polyline = decode(response.routes[0].overview_polyline.points)
             let steps = response.routes[0].legs[0].steps
             let instructions = []
             for (let i = 0; i < steps.length; i++){
                 instructions.push(steps[i].html_instructions)
             }
+            this.setState({searchSelected: true})
             this.setState({instructions});
             this.setState({polyline});
             this.setState({travelTime:response.routes[0].legs[0].duration.text})
-            console.log(this.state.instructions);
-            this.saveRoute();
         })
         .catch((error) => console.log(error))
     }
@@ -252,7 +286,6 @@ export default class GeoComponent extends Component {
             <View style={styles.map}>
                 <MapView
                 initialRegion={this.state.region}
-                region={this.state.region}
                 style={styles.map}
                 >
                 <MapView.Marker
@@ -275,7 +308,7 @@ export default class GeoComponent extends Component {
                 {this.state.polyline != null && 
                     <MapView.Polyline coordinates={this.state.polyline} 
                     strokeWidth={5} 
-                    strokeColor='blue'/>}
+                    strokeColor='#0D91E2'/>}
                 {this.state.polyline != null &&
                     <MapView.Marker
                       coordinate={{
@@ -297,10 +330,44 @@ export default class GeoComponent extends Component {
                     onSubmitEditing={async ()=>{
                         let dest = this.state.search.trim();
                         if (this.getDestCoord(dest)) {
-                            await this.getRoute(dest)
+                            await this.getRoute(`${this.state.region.latitude},${this.state.region.longitude}`,dest)
                         }
                     }}
                 />
+                {this.state.searchSelected ? 
+                <View style={styles.resultsContainer}>
+                    <View style={styles.titleContainer}>
+                        <Text style={styles.titleText}>{this.state.search}</Text>
+                    </View>
+                    <View style={styles.favContainer}>
+                        <TouchableOpacity style={styles.favButton} onPress={()=>this.saveRoute()}>
+                            <Text style={styles.favText}>+</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <View style={styles.closeContainer}>
+                        <TouchableOpacity style={[styles.favButton, {paddingBottom: 10}]} onPress={()=>this.setState({searchSelected: false, polyline: null})}>
+                            <Text style={styles.favText}>x</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <View style={styles.instContainer}>
+                        <View style={styles.estimateContainer}>
+                            <Text style={{fontSize: 24, fontWeight: 'bold'}}>Current Travel Time</Text>
+                            <Text style={{fontSize: 18}}>{this.state.travelTime}</Text>
+                        </View>
+                        {this.state.instructions != '' && 
+                        <ScrollView style={{alignSelf: 'flex-start', paddingLeft: 20, width: '100%', marginTop: 30}}>
+                            {this.state.instructions.map(instruction => (
+                                <View key={instruction} style={{height: 60, alignItems: 'center', flexDirection: 'row'}}>
+                                <View style={{height: 62, width: 5, backgroundColor: '#0D91E2', alignItems: 'center', justifyContent: 'center', marginLeft: 9}}>
+                                    <View style={{height: 20, width: 20, backgroundColor: '#fff', borderRadius: 10, borderColor: '#0D91E2', borderWidth: 3}}>
+                                    </View>
+                                </View>
+                                <Text style={{marginLeft: 20, fontSize: 24}}>{instruction}</Text>
+                                </View>
+                            ))}
+                        </ScrollView>}
+                    </View>
+                </View> :
                 <Animated.View style={[styles.infoBar, animatedStyle, {top: infoTop}]} {...this.panResponder.panHandlers}>
                     <View style={styles.infoTabs}>
                         <View style={styles.line}></View>
@@ -335,26 +402,22 @@ export default class GeoComponent extends Component {
                     </View> : 
                     <View>
                     {this.state.userRoutes.map(routeInfo => (
-                        <View key={routeInfo.id} style={styles.infoDisplay}>
-                            <View style={[styles.leftContainer, {alignItems: 'center'}]}>
-                                <TouchableOpacity style={styles.favButton}>
-                                    <Text style={styles.favText}>-</Text>
-                                </TouchableOpacity>
-                            </View>
+                        <TouchableOpacity key={routeInfo.id} style={styles.infoDisplay}
+                        onPress={()=>this.loadRoute(routeInfo.route)}>
                             <View style={styles.destContainer}>
-                                <Text style={styles.busDest}>{`from ${trimAddr(routeInfo.route.start)}`}</Text>
-                                <Text style={styles.busDest}>{`to ${trimAddr(routeInfo.route.end)}`}</Text>
+                                <Text style={styles.busDest}>{`FROM ${trimAddr(routeInfo.route.start)}`}</Text>
+                                <Text style={styles.busDest}>{`TO ${trimAddr(routeInfo.route.end)}`}</Text>
                             </View>
                             <View style={styles.nextContainer}>
-                                <Text style={styles.busNext}>Travel time</Text>
+                                <Text style={styles.busNext}>TRAVEL TIME</Text>
                                 <Text style={[styles.busNext, {color: '#777'}]}>{routeInfo.route.time}</Text>
                             </View>
-                        </View>
+                        </TouchableOpacity>
                     ))}
                     </View>}
-                </Animated.View>
+                </Animated.View>}
             </View>
-            : <ActivityIndicator size='large' />}
+            : <ActivityIndicator size='large' color='#0D91E2'/>}
             </View>
         )
     }
@@ -377,17 +440,62 @@ const styles = StyleSheet.create({
   inputContainer: {
     backgroundColor: '#fff',
     height: 45,
-    shadowColor: "#000",
-    shadowOffset: {
-        width: 0,
-        height: 9,
-    },
-    shadowOpacity: 0.48,
-    shadowRadius: 11.95,
   },
   searchText: {
     color: '#000',
-    fontSize: 24,
+    fontSize: 20,
+  },
+  resultsContainer: {
+    width: '100%',
+    position: 'absolute',
+    bottom: 0
+  },
+  titleContainer: {
+    position: 'absolute',
+    top: -80,
+    left: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  titleText: {
+    color: '#0D91E2',
+    fontSize: 36,
+    fontWeight: 'bold',
+  },
+  favContainer: {
+    height: 50,
+    position: 'absolute',
+    top: -80,
+    right: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeContainer: {
+    height: 50,
+    position: 'absolute',
+    top: -80,
+    right: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  instContainer: {
+    backgroundColor: '#f9f9f9',
+    height: 250,    
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 15,
+  },
+  estimateContainer: { 
+    justifyContent: 'center',
+    paddingLeft: 20,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    width: '95%',
+    position: 'absolute',
+    top: -25,
+    left: '2.5%',
+    zIndex: 2,
+    height: 70,
   },
   infoBar: {
     position: 'absolute',
@@ -444,6 +552,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0D91E2',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingBottom: 2
   },
   favText: {
     color: '#fff',
