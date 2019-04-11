@@ -1,10 +1,13 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
-import { TouchableOpacity, StyleSheet, Text, View, Animated, PanResponder, ActivityIndicator, Dimensions } from 'react-native';
+import { TouchableOpacity, StyleSheet, Text, View, Animated, PanResponder, ActivityIndicator, Image, Dimensions } from 'react-native';
 import { SearchBar } from 'react-native-elements'
 import Permissions from 'react-native-permissions'
 import MapView from 'react-native-maps'
-import { decode } from '../service/myService.js';
+import { decode, addRoute, trimAddr } from '../service/myService.js';
+import { db } from '../db.js';
+
+let routesRef = db.ref('/routes');
 
 export default class GeoComponent extends Component {
 
@@ -22,7 +25,9 @@ export default class GeoComponent extends Component {
             polyline: null,
             destination: null,
             destCoords: null,
-            travelTime: null
+            travelTime: null,
+            instructions: [],
+            userRoutes:[]
         }
         this.getCurrentLocation = this.getCurrentLocation.bind(this)
     }
@@ -53,8 +58,44 @@ export default class GeoComponent extends Component {
         })
     }
 
-    componentDidMount() {
-        this.getCurrentLocation()
+    async componentDidMount() {
+        this.getCurrentLocation();
+        await this.getSavedRoutes();
+    }
+
+    async getSavedRoutes(){
+        routesRef.on('value',async (snapshot)=>{
+          let data = snapshot.val();
+          let allRoutes = Object.values(data);
+          console.log(allRoutes);
+          userRoutes = []
+          for (let i = 0; i < allRoutes.length; i++) {
+            if (allRoutes[i].username == this.props.navigation.getParam('username','')) {
+                userRoutes.push(allRoutes[i])
+            }
+          }
+          this.setState({userRoutes});
+        })
+    }
+
+    async findAddress(lat,lng) {
+        let googleApi = `https://maps.googleapis.com/maps/api/geocode/json?`+
+                        `latlng=${lat},${lng}&`+
+                        `key=AIzaSyA2uBawhhpsC-QhPxkCcPeEeEKV5nKLSns`
+        return await fetch(googleApi)
+        .then((response)=>response.json())
+        .then((response)=>{return response.results[0].formatted_address})
+    }
+
+    async saveRoute(){
+        let startAddr = await this.findAddress(this.state.region.latitude,this.state.region.longitude)
+        let route = {
+            start: startAddr,
+            end:this.state.destination,
+            time:this.state.travelTime
+        }
+        console.log(route);
+        addRoute(this.props.navigation.getParam('username',''),route);
     }
 
     parseBusInfo(busStopNo,busStopName,busInfo) {
@@ -122,9 +163,16 @@ export default class GeoComponent extends Component {
         .then((response) => response.json())
         .then((response) => {
             let polyline = decode(response.routes[0].overview_polyline.points)
+            let steps = response.routes[0].legs[0].steps
+            let instructions = []
+            for (let i = 0; i < steps.length; i++){
+                instructions.push(steps[i].html_instructions)
+            }
+            this.setState({instructions});
             this.setState({polyline});
             this.setState({travelTime:response.routes[0].legs[0].duration.text})
-            console.log(this.state.travelTime);
+            console.log(this.state.instructions);
+            this.saveRoute();
         })
         .catch((error) => console.log(error))
     }
@@ -178,7 +226,6 @@ export default class GeoComponent extends Component {
             })
             await this.getStops();
             await this.getEstimates();
-            console.log(this.state.busInfo)
             this.setState({isLoaded:true})
         }, (error) => {console.log(error)})
     }
@@ -187,6 +234,7 @@ export default class GeoComponent extends Component {
         const animatedStyle = {
             transform: this.animatedValue.getTranslateTransform()
         }
+        let busStopIcon = require('../assets/bus_marker.png');
 
         let textTabBus = this.state.busStopSelected ? {opacity: 1} : {opacity: 0.5}
         let lineTabBus = this.state.busStopSelected ? {backgroundColor: '#fff'} : {backgroundColor: '#0D91E2'}
@@ -195,8 +243,11 @@ export default class GeoComponent extends Component {
 
         let infoTop = SCREEN_HEIGHT-170
 
+        setTimeout(()=>this.getEstimates(), 60000);
+
         return (
             <View style={styles.map}>
+            <Image source={busStopIcon} style={{height:0,width:0}} />
             {this.state.isLoaded ? 
             <View style={styles.map}>
                 <MapView
@@ -219,7 +270,7 @@ export default class GeoComponent extends Component {
                       }}
                       title={`StopNo ${marker.StopNo}`}
                       description={`${marker.Name}`}
-                      image={require('../assets/bus_marker.png')} />
+                      image={busStopIcon} />
                 ))}
                 {this.state.polyline != null && 
                     <MapView.Polyline coordinates={this.state.polyline} 
@@ -246,7 +297,7 @@ export default class GeoComponent extends Component {
                     onSubmitEditing={async ()=>{
                         let dest = this.state.search.trim();
                         if (this.getDestCoord(dest)) {
-                            this.getRoute(dest)
+                            await this.getRoute(dest)
                         }
                     }}
                 />
@@ -265,33 +316,41 @@ export default class GeoComponent extends Component {
                         </View>
                     </View>
                     {this.state.busStopSelected ? 
-                    <View style={styles.infoDisplay}>
+                    <View>
+                    {this.state.busInfo.map(bus => (
+                    <View key={`${bus.stopNo.toString() + bus.routeNo.toString()}`} style={styles.infoDisplay}>
                         <View style={styles.leftContainer}>
-                            <Text style={styles.busNum}>145</Text>
+                            <Text style={styles.busNum}>{bus.routeNo}</Text>
                         </View>
                         <View style={styles.destContainer}>
-                            <Text style={styles.busDest}>to BCIT</Text>
-                            <Text style={{fontSize: 16, color: '#777'}}>WB RUPERT ST FS E 43 AVE</Text>
+                            <Text style={styles.busDest}>{`to ${bus.destination}`}</Text>
+                            <Text style={{fontSize: 16, color: '#777'}}>{bus.stopName}</Text>
                         </View>
                         <View style={styles.nextContainer}>
                             <Text style={styles.busNext}>Leaves in</Text>
-                            <Text style={[styles.busNext, {color: '#777'}]}>10 min</Text>
+                            <Text style={[styles.busNext, {color: '#777'}]}>{`${bus.countdown} mins`}</Text>
                         </View>
+                    </View>
+                    ))}
                     </View> : 
-                    <View style={styles.infoDisplay}>
-                        <View style={[styles.leftContainer, {alignItems: 'center'}]}>
-                            <TouchableOpacity style={styles.favButton}>
-                                <Text style={styles.favText}>-</Text>
-                            </TouchableOpacity>
+                    <View>
+                    {this.state.userRoutes.map(routeInfo => (
+                        <View key={routeInfo.id} style={styles.infoDisplay}>
+                            <View style={[styles.leftContainer, {alignItems: 'center'}]}>
+                                <TouchableOpacity style={styles.favButton}>
+                                    <Text style={styles.favText}>-</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.destContainer}>
+                                <Text style={styles.busDest}>{`from ${trimAddr(routeInfo.route.start)}`}</Text>
+                                <Text style={styles.busDest}>{`to ${trimAddr(routeInfo.route.end)}`}</Text>
+                            </View>
+                            <View style={styles.nextContainer}>
+                                <Text style={styles.busNext}>Travel time</Text>
+                                <Text style={[styles.busNext, {color: '#777'}]}>{routeInfo.route.time}</Text>
+                            </View>
                         </View>
-                        <View style={styles.destContainer}>
-                            <Text style={styles.busDest}>from BCIT</Text>
-                            <Text style={styles.busDest}>to BCIT</Text>
-                        </View>
-                        <View style={styles.nextContainer}>
-                            <Text style={styles.busNext}>Travel time</Text>
-                            <Text style={[styles.busNext, {color: '#777'}]}>10 min</Text>
-                        </View>
+                    ))}
                     </View>}
                 </Animated.View>
             </View>

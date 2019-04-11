@@ -7,6 +7,19 @@ export const addUser = (username,password) => {
 	})
 }
 
+export const addRoute = (username,route) => {
+  let identifier = username + JSON.stringify(route)
+  db.ref('/routes').push({
+    id:identifier,
+    username:username,
+    route:route
+  })
+}
+
+export const trimAddr = (address) => {
+  return address.split(',').slice(0,-2).join(',')
+}
+
 export const decode = (encoded) => {
 
     // array that holds the points

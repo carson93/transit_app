@@ -25,6 +25,7 @@ export default class HomeComponent extends Component {
         itemsRef.on('value',async (snapshot)=>{
           let data = snapshot.val();
           let users = Object.values(data);
+          console.log(users);
           this.setState({users})
         })
     }
@@ -41,8 +42,7 @@ export default class HomeComponent extends Component {
     respond(username, password){
         if (this.checkUser(username, password)) {
             this.props.navigation.navigate('Map', {
-                username: username,
-                password: password,
+                username: username
             })
         } else {
             Alert.alert(
